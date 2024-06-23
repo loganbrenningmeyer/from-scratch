@@ -200,6 +200,8 @@ class NeuralNetwork:
         d_output = dL/da_o * da_o/dz_o * dz_o/dw_i
                  = δ_o * a_i
         '''
+        print(f"y_hat: {y_hat}")
+        print(f"y: {y}")
         print(f"\nLoss: {np.average(y_hat - y)}")
 
         delta = []
@@ -248,11 +250,16 @@ class NeuralNetwork:
             layer.B = layer.B - self.lr * batch_der_b
 
     def train(self, loader: DataLoader, epochs=100):
-        for _ in range(epochs):
+        for epoch in range(epochs):
             for X, y in loader:
 
                 y_hat = self.forward(X)
                 self.backward(y, y_hat)
+
+            # Print loss every 100 epochs to monitor progress
+            if epoch % 100 == 0:
+                loss = np.mean((y - y_hat)**2)
+                print(f"Epoch {epoch}, Loss: {loss}")
 
 # XOR dataset
 X = np.array([[0, 0],
@@ -265,9 +272,9 @@ y = np.array([[0],
               [0]])
 
 dataset = np.array([(x, yi) for x, yi in zip(X, y)], dtype=object)
-loader = DataLoader(dataset, batch_size=4, shuffle=True)
+loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
-nn = NeuralNetwork(layers=[2, 2], activation='relu', lr=0.1)
+nn = NeuralNetwork(layers=[2], activation='relu', lr=0.1)
 nn.train(loader, epochs=10000)
 
 def evaluate_nn(nn, X, y):
