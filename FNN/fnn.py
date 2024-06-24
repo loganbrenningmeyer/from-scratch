@@ -93,41 +93,6 @@ class DataLoader:
             return X, y
         else:
             raise StopIteration
-
-'''
-A singular neuron in the network with its own weights and bias
-- num_inputs: Number of input connections into the neuron (# neurons in previous layer)
-- activation: String defining which activation function to use
-'''
-class Neuron:
-    def __init__(self, num_inputs: int, activation: str):
-        '''
-        Randomly initialize weights/bias
-        '''
-        # self.weights = np.random.randn(num_inputs)
-        # self.bias = np.random.randn()
-
-        # self.weights = np.empty(shape=())
-
-        # self.a = np.array([])
-        # self.z = np.array([])
-
-        if activation == 'sigmoid':
-            self.activation = Activation('sigmoid')
-        elif activation == 'relu':
-            self.activation = Activation('relu')
-        else:
-            print("Invalid activation function")
-
-    # def activate(self, z: float) -> float:
-    #     a = self.activation(z)
-    #     self.a = np.append(self.a, a)
-    #     return a
-
-    # def weighted_sum(self, X: np.ndarray) -> float:
-    #     z = np.dot(X, self.weights) + self.bias
-    #     self.z = np.append(self.z, z)
-    #     return z
         
 '''
 An array of neurons representing a layer in the network
@@ -136,28 +101,20 @@ An array of neurons representing a layer in the network
 '''
 class Layer:
     def __init__(self, num_neurons: int, num_inputs: int, activation: str):
-        # self.neurons = [Neuron(num_inputs, activation) for _ in range(num_neurons)]
         self.num_neurons = num_neurons
+
         # -- Arrays to store weights/biases for each neuron in the layer
         self.W = np.random.normal(size=(num_neurons, num_inputs))
         self.B = np.random.normal(size=num_neurons)
-        # -- Store each neuron's weighted sum (z) and output (a)
-        # self.Z = np.empty(shape=num_neurons)
-        # self.A = np.empty(shape=num_neurons)
+
         if activation == 'sigmoid':
             self.activation = Activation('sigmoid')
         elif activation == 'relu':
             self.activation = Activation('relu')
         elif activation == 'softmax':
-            self.activation = Activation
+            self.activation = Activation('softmax')
         else:
             print("Invalid activation function")
-
-    # def weighted_sums(self):
-    #     return np.array([n.z for n in self.neurons])
-
-    # def outputs(self):
-    #     return np.array([n.a for n in self.neurons])
 
 '''
 Network built as an array of layers
@@ -307,33 +264,3 @@ class NeuralNetwork:
                 print(f"Batch {i + 1} accuracy: {accuracy * 100:.2f}%")
             
         print(f"Total accuracy: {total_accuracy / i * 100:.2f}%")
-
-
-# # XOR dataset
-# X = np.array([[0, 0],
-#               [0, 1],
-#               [1, 0],
-#               [1, 1]])
-# y = np.array([[0],
-#               [1],
-#               [1],
-#               [0]])
-
-# dataset = np.array([(x, yi) for x, yi in zip(X, y)], dtype=object)
-# loader = DataLoader(dataset, batch_size=1, shuffle=True)
-
-# nn = NeuralNetwork(layers=[2], activation='relu', lr=0.1)
-# nn.train(loader, epochs=10000)
-
-# def evaluate_nn(nn, X, y):
-#     correct = 0
-#     for xi, yi in zip(X, y):
-#         output = nn.forward(np.array([xi]))
-#         predicted = 1 if output >= 0.5 else 0
-#         print(f"Input: {xi}, Predicted: {predicted}, Actual: {yi[0]}")
-#         if predicted == yi[0]:
-#             correct += 1
-#     accuracy = correct / len(X)
-#     print(f"Accuracy: {accuracy * 100}%")
-
-# evaluate_nn(nn, X, y)

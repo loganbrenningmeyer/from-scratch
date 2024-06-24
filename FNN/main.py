@@ -14,17 +14,17 @@ if __name__ == "__main__":
     print(y_train.shape)
 
     in_features = len(x_train[0].flatten())
-    classes = 2
+    classes = 10
 
     print(f"in_features: {in_features}")
     print(f"classes: {classes}")
 
     # -- Filter the data for binary classification (digits 0 and 1)
-    train_filter = np.where((y_train == 0) | (y_train == 1))
-    test_filter = np.where((y_test == 0) | (y_test == 1))
+    # train_filter = np.where((y_train == 0) | (y_train == 1))
+    # test_filter = np.where((y_test == 0) | (y_test == 1))
 
-    x_train, y_train = x_train[train_filter], y_train[train_filter]
-    x_test, y_test = x_test[test_filter], y_test[test_filter]
+    # x_train, y_train = x_train[train_filter], y_train[train_filter]
+    # x_test, y_test = x_test[test_filter], y_test[test_filter]
 
     # -- Normalize the data
     x_train, x_test = x_train / 255.0, x_test / 255.0
