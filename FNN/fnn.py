@@ -21,25 +21,46 @@ class Activation:
         elif activation == 'relu':
             self.output = self.relu
             self.der = self.d_relu
+        elif activation == 'softmax':
+            self.output = self.softmax
+            self.der = self.d_softmax
 
-    def __call__(self, z: np.ndarray) -> np.ndarray:
-        return self.output(z)
-
-    @staticmethod
-    def sigmoid(z: np.ndarray) -> np.ndarray:
-        return 1 / (1 + np.exp(-z))
+    def __call__(self, Z: np.ndarray) -> np.ndarray:
+        return self.output(Z)
     
     @staticmethod
-    def relu(z: np.ndarray) -> np.ndarray:
-        return np.maximum(0, z)
+    def softmax(Z: np.ndarray) -> np.ndarray:
+        return np.exp(Z) / np.sum(np.exp(Z))
+    
+    @staticmethod
+    def d_softmax(Z: np.ndarray) -> np.ndarray:
+        S = Activation.softmax(Z)
+        jacobian_m = np.zeros((Z.shape[0], Z.shape[1], Z.shape[1]))
+        
+        for i in range(Z.shape[0]):
+            for j in range(Z.shape[1]):
+                for k in range(Z.shape[1]):
+                    if j == k:
+                        jacobian_m[i][j][k] = S[i][j] * (1 - S[i][j])
+                    else:
+                        jacobian_m[i][j][k] = -S[i][j] * S[i][k]
+        return jacobian_m
 
     @staticmethod
-    def d_sigmoid(z: np.ndarray) -> np.ndarray:
-        return Activation.sigmoid(z) * (1 - Activation.sigmoid(z))
+    def sigmoid(Z: np.ndarray) -> np.ndarray:
+        return 1 / (1 + np.exp(-Z))
+    
+    @staticmethod
+    def relu(Z: np.ndarray) -> np.ndarray:
+        return np.maximum(0, Z)
 
     @staticmethod
-    def d_relu(z: np.ndarray) -> np.ndarray:
-        return np.where(z > 0, 1, 0)
+    def d_sigmoid(Z: np.ndarray) -> np.ndarray:
+        return Activation.sigmoid(Z) * (1 - Activation.sigmoid(Z))
+
+    @staticmethod
+    def d_relu(Z: np.ndarray) -> np.ndarray:
+        return np.where(Z > 0, 1, 0)
 
 class DataLoader:
     def __init__(self, dataset: np.ndarray, batch_size: int = 8, shuffle: bool = True):
@@ -51,7 +72,7 @@ class DataLoader:
         self.current_batch = 0
 
         if shuffle:
-            np.random.shuffle(X)
+            np.random.shuffle(dataset)
 
         #print(dataset)
         #print(dataset.shape)
@@ -98,15 +119,15 @@ class Neuron:
         else:
             print("Invalid activation function")
 
-    def activate(self, z: float) -> float:
-        a = self.activation(z)
-        self.a = np.append(self.a, a)
-        return a
+    # def activate(self, z: float) -> float:
+    #     a = self.activation(z)
+    #     self.a = np.append(self.a, a)
+    #     return a
 
-    def weighted_sum(self, X: np.ndarray) -> float:
-        z = np.dot(X, self.weights) + self.bias
-        self.z = np.append(self.z, z)
-        return z
+    # def weighted_sum(self, X: np.ndarray) -> float:
+    #     z = np.dot(X, self.weights) + self.bias
+    #     self.z = np.append(self.z, z)
+    #     return z
         
 '''
 An array of neurons representing a layer in the network
@@ -115,8 +136,8 @@ An array of neurons representing a layer in the network
 '''
 class Layer:
     def __init__(self, num_neurons: int, num_inputs: int, activation: str):
-        self.neurons = [Neuron(num_inputs, activation) for _ in range(num_neurons)]
-
+        # self.neurons = [Neuron(num_inputs, activation) for _ in range(num_neurons)]
+        self.num_neurons = num_neurons
         # -- Arrays to store weights/biases for each neuron in the layer
         self.W = np.random.normal(size=(num_neurons, num_inputs))
         self.B = np.random.normal(size=num_neurons)
@@ -127,6 +148,8 @@ class Layer:
             self.activation = Activation('sigmoid')
         elif activation == 'relu':
             self.activation = Activation('relu')
+        elif activation == 'softmax':
+            self.activation = Activation
         else:
             print("Invalid activation function")
 
@@ -142,14 +165,14 @@ Network built as an array of layers
   i.e. [1, 2, 3] means there are 3 hidden layers, with 1, 2, and 3 neurons respectively
 '''
 class NeuralNetwork:
-    def __init__(self, layers: list[int], activation: str, lr: float = 0.01):
+    def __init__(self, layers: list[int], activation: str, in_features: int, classes: int, lr: float = 0.01):
 
         self.lr = lr
 
         self.layers = []
 
         # -- Will update first layer's num_inputs when data is provided
-        num_inputs = 2
+        num_inputs = in_features
 
         for num_neurons in layers:
             self.layers.append(Layer(num_neurons, num_inputs, activation))
@@ -157,7 +180,10 @@ class NeuralNetwork:
             num_inputs = num_neurons
 
         # -- Add output layer
-        self.layers.append(Layer(num_neurons=1, num_inputs=num_inputs, activation='sigmoid'))
+        if classes == 2:
+            self.layers.append(Layer(num_neurons=1, num_inputs=num_inputs, activation='sigmoid'))
+        else:
+            self.layers.append(Layer(num_neurons=classes, num_inputs=num_inputs, activation='softmax'))
 
     def forward(self, X: np.ndarray) -> float:
         '''
@@ -167,7 +193,9 @@ class NeuralNetwork:
         # -- Save for backprop
         self.X = X
 
-        for i, layer in enumerate(self.layers):
+        for layer in self.layers:
+            # print(f"X: {X}")
+            # print(f"layer.W.T: {layer.W.T}")
             Z = np.dot(X, layer.W.T) + layer.B
             A = layer.activation(Z)
 
@@ -178,7 +206,7 @@ class NeuralNetwork:
             # -- Update X for the next layer
             X = A
 
-        return self.layers[-1].A
+        return self.layers[-1].A.reshape(-1,)
     
     def backward(self, y: np.ndarray, y_hat: np.ndarray):
         '''
@@ -200,17 +228,22 @@ class NeuralNetwork:
         d_output = dL/da_o * da_o/dz_o * dz_o/dw_i
                  = δ_o * a_i
         '''
-        print(f"y_hat: {y_hat}")
-        print(f"y: {y}")
-        print(f"\nLoss: {np.average(y_hat - y)}")
 
         delta = []
         der_w = []
 
         # -- Output layer
-        delta_o = np.array((y_hat - y) * (y_hat * (1 - y_hat))).reshape(-1, 1)
-
+        # print(f"y_hat.shape: {y_hat.shape}")
+        # print(f"y.shape: {y.shape}")
+        # print(f"(y_hat - y).shape: {(y_hat - y).shape}")
+        o = self.layers[-1]
+        dL = (y_hat - y).reshape(-1, o.num_neurons)
+        # print(f"o.activation.der(o.Z).shape: {o.activation.der(o.Z).shape}")
+        delta_o = np.array(dL * o.activation.der(o.Z))
         der_w_o = np.einsum('is,so->soi', self.layers[-2].A.T, delta_o)
+        # print(f"delta_o.shape: {delta_o.shape}")
+        # print(f"self.layers[-2].A.T.shape: {self.layers[-2].A.T.shape}")
+        # print(f"delta_o.shape: {delta_o.shape}")
 
         delta.append(delta_o)
         der_w.append(der_w_o)
@@ -249,43 +282,58 @@ class NeuralNetwork:
             layer.W = layer.W - self.lr * batch_der_w
             layer.B = layer.B - self.lr * batch_der_b
 
+
     def train(self, loader: DataLoader, epochs=100):
         for epoch in range(epochs):
-            for X, y in loader:
+            for i, (X, y) in enumerate(loader):
 
                 y_hat = self.forward(X)
-                self.backward(y, y_hat)
+                loss = self.backward(y, y_hat)
 
             # Print loss every 100 epochs to monitor progress
-            if epoch % 100 == 0:
-                loss = np.mean((y - y_hat)**2)
-                print(f"Epoch {epoch}, Loss: {loss}")
+            loss = np.mean((y - y_hat)**2)
+            print(f"Epoch {epoch}, Loss: {loss}")
 
-# XOR dataset
-X = np.array([[0, 0],
-              [0, 1],
-              [1, 0],
-              [1, 1]])
-y = np.array([[0],
-              [1],
-              [1],
-              [0]])
+    def test(self, loader: DataLoader):
+        total_accuracy = 0
 
-dataset = np.array([(x, yi) for x, yi in zip(X, y)], dtype=object)
-loader = DataLoader(dataset, batch_size=1, shuffle=True)
+        for i, (X, y) in enumerate(loader):
+            y_hat = self.forward(X)
+            correct = np.sum(np.round(y_hat) == y)
+            accuracy = correct / len(y)
+            total_accuracy += accuracy
 
-nn = NeuralNetwork(layers=[2], activation='relu', lr=0.1)
-nn.train(loader, epochs=10000)
+            if i % 50 == 0:
+                print(f"Batch {i + 1} accuracy: {accuracy * 100:.2f}%")
+            
+        print(f"Total accuracy: {total_accuracy / i * 100:.2f}%")
 
-def evaluate_nn(nn, X, y):
-    correct = 0
-    for xi, yi in zip(X, y):
-        output = nn.forward(np.array([xi]))
-        predicted = 1 if output >= 0.5 else 0
-        print(f"Input: {xi}, Predicted: {predicted}, Actual: {yi[0]}")
-        if predicted == yi[0]:
-            correct += 1
-    accuracy = correct / len(X)
-    print(f"Accuracy: {accuracy * 100}%")
 
-evaluate_nn(nn, X, y)
+# # XOR dataset
+# X = np.array([[0, 0],
+#               [0, 1],
+#               [1, 0],
+#               [1, 1]])
+# y = np.array([[0],
+#               [1],
+#               [1],
+#               [0]])
+
+# dataset = np.array([(x, yi) for x, yi in zip(X, y)], dtype=object)
+# loader = DataLoader(dataset, batch_size=1, shuffle=True)
+
+# nn = NeuralNetwork(layers=[2], activation='relu', lr=0.1)
+# nn.train(loader, epochs=10000)
+
+# def evaluate_nn(nn, X, y):
+#     correct = 0
+#     for xi, yi in zip(X, y):
+#         output = nn.forward(np.array([xi]))
+#         predicted = 1 if output >= 0.5 else 0
+#         print(f"Input: {xi}, Predicted: {predicted}, Actual: {yi[0]}")
+#         if predicted == yi[0]:
+#             correct += 1
+#     accuracy = correct / len(X)
+#     print(f"Accuracy: {accuracy * 100}%")
+
+# evaluate_nn(nn, X, y)
