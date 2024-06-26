@@ -30,14 +30,14 @@ if __name__ == "__main__":
     x_train, x_test = x_train / 255.0, x_test / 255.0
 
     train_dataset = np.array([(x.flatten(), yi) for x, yi in zip(x_train, y_train)], dtype=object)
-    train_loader = DataLoader(dataset=train_dataset, batch_size=16, shuffle=True)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=8, shuffle=True)
 
-    test_dataset = np.array([(x.flatten(), yi) for x, yi in zip(x_train, y_train)], dtype=object)
-    test_loader = DataLoader(dataset=test_dataset, batch_size=16, shuffle=False)
+    test_dataset = np.array([(x.flatten(), yi) for x, yi in zip(x_test, y_test)], dtype=object)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=8, shuffle=False)
 
     # -- Initialize neural network
-    model = NeuralNetwork(layers=[128, 64, 32], activation='relu', lr=0.1, in_features=in_features, classes=classes)
+    model = NeuralNetwork(layers=[128, 64], activation='leaky', lr=0.002, in_features=in_features, classes=classes)
 
     # -- Train the network
-    model.train(train_loader, epochs=5)
+    model.train(train_loader, test_loader, epochs=50)
     model.test(test_loader)
