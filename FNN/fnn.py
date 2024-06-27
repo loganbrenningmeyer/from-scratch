@@ -72,6 +72,17 @@ class Activation:
         dZ = np.ones_like(Z)
         dZ[Z < 0] = alpha
         return dZ
+    
+class Dataset:
+    def __init__(self, X, y, train_ratio=0.8):
+        dataset = np.array([(x, yi) for x, yi in zip(X, y)], dtype=object)
+        np.random.shuffle(dataset)
+
+        train_size = int(0.8*len(dataset))
+
+        self.train_dataset = dataset[:train_size]
+        self.test_dataset = dataset[train_size:]
+        
 
 class DataLoader:
     def __init__(self, dataset: np.ndarray, batch_size: int = 8, shuffle: bool = True):
@@ -112,8 +123,16 @@ class Layer:
         self.num_neurons = num_neurons
 
         # -- Arrays to store weights/biases for each neuron in the layer
-        self.W = np.random.normal(size=(num_neurons, num_inputs))
-        self.B = np.random.normal(size=num_neurons)
+        '''
+        He Initialization:
+        - W[l] = np.random.randn(size_l, size_l-1) * np.sqrt(2/size_l-1)
+        '''
+        self.W = np.random.randn(num_neurons, num_inputs) * np.sqrt(2/num_inputs)
+        self.B = np.random.randn(num_neurons) * np.sqrt(2/num_inputs)
+
+        # -- Normal distribution initialization
+        # self.W = np.random.normal(size=(num_neurons, num_inputs))
+        # self.B = np.random.normal(size=num_neurons)
 
         if activation == 'sigmoid':
             self.activation = Activation('sigmoid')
@@ -332,7 +351,10 @@ class NeuralNetwork:
 
             # -- Test every 10  epochs
             if epoch % 1 == 0:
+                print("Test:")
                 self.test(test_loader)
+                print("Train:")
+                self.test(train_loader)
 
     def test(self, loader: DataLoader):
         total_correct = 0
