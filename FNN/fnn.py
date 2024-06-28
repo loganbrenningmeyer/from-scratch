@@ -7,9 +7,10 @@ Classes:
 - Layer
 '''
 import numpy as np
+import json
 
-from data import Dataset, DataLoader
-from loss import CrossEntropyLoss, MeanSquaredError
+from data import DataLoader
+from metrics import CrossEntropyLoss, MeanSquaredError, Accuracy
 
 '''
 Stores multiple activation functions and their derivative functions
@@ -75,13 +76,16 @@ class Activation:
         dZ[Z < 0] = alpha
         return dZ
         
-'''
-An array of neurons representing a layer in the network
-- num_neurons: Number of neurons in the layer being created
-- num_inputs: Number of neurons in the previous layer
-'''
 class Layer:
     def __init__(self, num_neurons: int, num_inputs: int, activation: str):
+        '''
+        An array of neurons representing a layer in the network
+
+        Parameters:
+        - num_neurons: Number of neurons in the layer being created
+        - num_inputs: Number of neurons in the previous layer
+        - activation: String defining the activation function used in the layer ['sigmoid', 'relu', 'leaky']
+        '''
         self.num_neurons = num_neurons
 
         # -- Arrays to store weights/biases for each neuron in the layer
@@ -103,17 +107,29 @@ class Layer:
         else:
             print("Invalid activation function")
 
-'''
-Network built as an array of layers
-- layers: Array describing the number of neurons in each layer
-  i.e. [1, 2, 3] means there are 3 hidden layers, with 1, 2, and 3 neurons respectively
-'''
-class NeuralNetwork:
-    def __init__(self, layers: list[int], activation: str, in_features: int, classes: int, lr: float = 0.01):
-        self.in_features = in_features
-        self.classes = classes
-        self.lr = lr
 
+class NeuralNetwork:
+    def __init__(self, layers: list[int], activation: str, in_features: int, num_classes: int, lr: float = 0.01):
+        '''
+        Network built as an array of layers
+
+        Parameters:
+        - layers: Array describing the number of neurons in each layer
+            * e.g. [1, 2, 3] means there are 3 hidden layers, with 1, 2, and 3 neurons respectively
+        - activation: String defining the activation function used in hidden layers ['sigmoid', 'relu', 'leaky']
+        - in_features: Number of input features
+        - num_classes: Number of output classes
+        - lr: Learning rate for training (0, 1)
+        '''
+        self.in_features = in_features
+        self.num_classes = num_classes
+
+        if activation not in ['sigmoid', 'relu', 'leaky']:
+            print("Error: Invalid activation function")
+            return
+        self.activation = activation
+        self.lr = lr
+        
         self.layers = []
 
         # -- Will update first layer's num_inputs when data is provided
@@ -125,10 +141,10 @@ class NeuralNetwork:
             num_inputs = num_neurons
 
         # -- Add output layer
-        if classes == 2:
+        if num_classes == 2:
             self.layers.append(Layer(num_neurons=1, num_inputs=num_inputs, activation='sigmoid'))
         else:
-            self.layers.append(Layer(num_neurons=classes, num_inputs=num_inputs, activation='softmax'))
+            self.layers.append(Layer(num_neurons=num_classes, num_inputs=num_inputs, activation='softmax'))
 
     def forward(self, X: np.ndarray) -> np.ndarray:
         '''
@@ -138,7 +154,7 @@ class NeuralNetwork:
         # -- Save for backprop
         self.X = X
 
-        for i, layer in enumerate(self.layers):
+        for layer in self.layers:
             Z = np.dot(X, layer.W.T) + layer.B
 
             A = layer.activation(Z)
@@ -167,12 +183,7 @@ class NeuralNetwork:
         - y: Numpy array of correct labels for the batch
         - y_hat: Numpy array of network predictions for the batch
         '''
-
-        '''
-        d_output = dL/da_o * da_o/dz_o * dz_o/dw_i
-                 = δ_o * a_i
-        '''
-        num_samples = y.shape[0]
+        batch_size = y.shape[0]
 
         delta = []
         der_w = []
@@ -188,20 +199,18 @@ class NeuralNetwork:
         o = self.layers[-1]
 
         # -- Binary
-        if self.classes == 2:
+        if self.num_classes == 2:
             dL = (y_hat - y.reshape(-1, 1))
             delta_o = np.array(dL * o.activation.der(o.Z))
         # -- Multiclass
         else:
             # Convert y to one hot encoding for softmax, e.g. [0 1] for y = 1
-            one_hot = np.zeros(shape=(y.shape[0], self.classes))
-            one_hot[np.arange(y.shape[0]), y.astype(dtype=int)] = 1
-            y = one_hot
+            y = np.eye(self.num_classes)[y.astype(int)]
 
             delta_o = y_hat - y
 
-        der_w_o = np.dot(delta_o.T, self.layers[-2].A) / num_samples
-        der_b_o = np.sum(delta_o, axis=0) / num_samples
+        der_w_o = np.dot(delta_o.T, self.layers[-2].A) / batch_size
+        der_b_o = np.sum(delta_o, axis=0) / batch_size
 
         delta.insert(0, delta_o)
         der_w.insert(0, der_w_o)
@@ -221,12 +230,12 @@ class NeuralNetwork:
 
             delta_j = np.dot(delta_k, k.W) * j.activation.der(j.Z)
 
-            der_b_j = np.sum(delta_j) / num_samples
+            der_b_j = np.sum(delta_j) / batch_size
 
             if layer == 0:
-                der_w_j = np.dot(delta_j.T, self.X) / num_samples
+                der_w_j = np.dot(delta_j.T, self.X) / batch_size
             else:
-                der_w_j = np.dot(delta_j.T, i.A) / num_samples
+                der_w_j = np.dot(delta_j.T, i.A) / batch_size
 
             delta.insert(0, delta_j)
             der_w.insert(0, der_w_j)
@@ -237,38 +246,74 @@ class NeuralNetwork:
         - Average the weight derivative among the batch samples for each weight
         '''
         for i, layer in enumerate(self.layers):
-
             layer.W = layer.W - self.lr * der_w[i]
             layer.B = layer.B - self.lr * der_b[i]
 
 
     def train(self, train_loader: DataLoader, test_loader: DataLoader, epochs=100):
         for epoch in range(epochs):
-            for i, (X, y) in enumerate(train_loader):
-
+            for X, y in train_loader:
                 y_hat = self.forward(X)
                 self.backward(y, y_hat)
 
-            if epoch % 100 == 0:
-                loss = MeanSquaredError(y_hat, y, self.classes)
-                print(f"Epoch {epoch}, Loss: {loss}")
+            loss = CrossEntropyLoss(y_hat, y)
+            print(f"Epoch {epoch} -- Loss: {loss}, Train Accuracy: {Accuracy(y_hat, y)[0] * 100:.2f}%")
+
+            if epoch % 10 == 0:
                 self.test(test_loader)
 
 
     def test(self, loader: DataLoader):
         total_correct = 0
-        total_samples = 0
+        total_incorrect = 0
+        total_accuracy = 0
 
         for i, (X, y) in enumerate(loader):
             y_hat = self.forward(X)
 
-            if self.classes == 2:
-                y_hat_class = np.round(y_hat)
-            else:
-                y_hat_class = np.argmax(y_hat, axis=1)
+            batch_accuracy, batch_correct, batch_incorrect = Accuracy(y_hat, y)
 
-            correct = np.sum(y_hat_class.T == y)
-            total_correct += correct
-            total_samples += len(y)
+            total_correct += batch_correct
+            total_incorrect += batch_incorrect
+            total_accuracy += batch_accuracy
 
-        print(f"Accuracy: {total_correct / total_samples * 100:.2f}%; {total_correct} correct, {total_samples - total_correct} wrong")
+        print(f"-- Test Accuracy: {total_accuracy / (i + 1) * 100:.2f}%; {total_correct} correct, {total_incorrect} incorrect")
+
+    def save(self, filename: str) -> None:
+        model_params = {'layers': [layer.num_neurons for layer in self.layers[:-1]],
+                        'in_features': self.in_features,
+                        'num_classes': self.num_classes,
+                        'activation': self.activation,
+                        'lr': self.lr,
+                        'W': [layer.W.tolist() for layer in self.layers],
+                        'B': [layer.B.tolist() for layer in self.layers]}
+        
+        with open(f'{filename}.json', 'w') as file:
+            json.dump(model_params, file)
+
+    @staticmethod
+    def load(filepath: str) -> 'NeuralNetwork':
+        with open(filepath, 'r') as file:
+            model_params = json.load(file)
+
+        layers = model_params['layers']
+        activation = model_params['activation']
+        lr = model_params['lr']
+        W = model_params['W']
+        B = model_params['B']
+        in_features = model_params['in_features']
+        num_classes = model_params['num_classes']
+
+        model = NeuralNetwork(layers=layers,
+                              activation=activation,
+                              in_features=in_features,
+                              num_classes=num_classes,
+                              lr=lr)
+
+        for i, layer in enumerate(model.layers):
+            layer.W = np.array(W[i])
+            layer.B = np.array(B[i])
+
+        return model
+
+        
