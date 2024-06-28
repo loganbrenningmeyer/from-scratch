@@ -20,29 +20,29 @@ if __name__ == "__main__":
         data = np.array(csv)
         X = data[:,:-1]
         y = data.T[-1]
-        y = np.array([0 if yi < 3 else 1 for yi in y])
-        classes = 2
+        # y = np.array([0 if yi < 3 else 1 for yi in y])
+        classes = 5
     elif data_id == 2:
         mnist = tf.keras.datasets.mnist
         (x_train, y_train), (x_test, y_test) = mnist.load_data()
         X = np.concatenate((x_train, x_test), axis=0) / 255.0
         X = np.array([x.flatten() for x in X])
-        y = np.concatenate((y_train, y_test), axis=0) / 255.0
-        y = [0 if yi < 5 else 1 for yi in y]
-        classes = 2
+        y = np.concatenate((y_train, y_test), axis=0)
+        # y = [0 if yi < 5 else 1 for yi in y]
+        classes = 10
 
     dataset = Dataset(X, y)
 
-    train_loader = DataLoader(dataset.train_dataset, batch_size=4, shuffle=True)
+    train_loader = DataLoader(dataset.train_dataset, batch_size=16, shuffle=True)
     test_loader = DataLoader(dataset.test_dataset, batch_size=1, shuffle=False)
 
     model = NeuralNetwork(layers=[64, 32],
                           activation='relu',
                           in_features=X.shape[1],
                           classes=classes,
-                          lr=0.001)
+                          lr=0.01)
     
-    model.train(train_loader, test_loader, epochs=10000)
+    model.train(train_loader, test_loader, epochs=1000)
 
     model.test(test_loader)
 

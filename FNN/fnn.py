@@ -7,7 +7,9 @@ Classes:
 - Layer
 '''
 import numpy as np
-import math
+
+from data import Dataset, DataLoader
+from loss import CrossEntropyLoss, MeanSquaredError
 
 '''
 Stores multiple activation functions and their derivative functions
@@ -50,14 +52,14 @@ class Activation:
     def sigmoid(Z: np.ndarray) -> np.ndarray:
         Z = np.clip(Z, -500, 500)  # Clip values to avoid overflow
         return 1 / (1 + np.exp(-Z))
-    
-    @staticmethod
-    def relu(Z: np.ndarray) -> np.ndarray:
-        return np.maximum(0, Z)
 
     @staticmethod
     def d_sigmoid(Z: np.ndarray) -> np.ndarray:
         return Activation.sigmoid(Z) * (1 - Activation.sigmoid(Z))
+    
+    @staticmethod
+    def relu(Z: np.ndarray) -> np.ndarray:
+        return np.maximum(0, Z)
 
     @staticmethod
     def d_relu(Z: np.ndarray) -> np.ndarray:
@@ -72,46 +74,6 @@ class Activation:
         dZ = np.ones_like(Z)
         dZ[Z < 0] = alpha
         return dZ
-    
-class Dataset:
-    def __init__(self, X, y, train_ratio=0.8):
-        dataset = np.array([(x, yi) for x, yi in zip(X, y)], dtype=object)
-        np.random.shuffle(dataset)
-
-        train_size = int(0.8*len(dataset))
-
-        self.train_dataset = dataset[:train_size]
-        self.test_dataset = dataset[train_size:]
-        
-
-class DataLoader:
-    def __init__(self, dataset: np.ndarray, batch_size: int = 8, shuffle: bool = True):
-        '''
-        - dataset: Numpy array of X, y sample/target pairs
-        - batch_size: Size of a training batch within the dataset
-        - train_size: Proportion of the full dataset allocated to training
-        '''
-        self.current_batch = 0
-
-        if shuffle:
-            np.random.shuffle(dataset)
-
-        # -- Split into batches
-        self.dataset = [dataset[i:i + batch_size] for i in range(0, len(dataset), batch_size)]
-    
-    def __iter__(self):
-        self.current_batch = 0
-        return self
-    
-    def __next__(self):
-        if self.current_batch < len(self.dataset):
-            batch = self.dataset[self.current_batch]
-            X = np.array([x for x, y in batch], dtype=np.float32)
-            y = np.array([y for x, y in batch], dtype=np.double)
-            self.current_batch += 1
-            return X, y
-        else:
-            raise StopIteration
         
 '''
 An array of neurons representing a layer in the network
@@ -129,10 +91,6 @@ class Layer:
         '''
         self.W = np.random.randn(num_neurons, num_inputs) * np.sqrt(2/num_inputs)
         self.B = np.random.randn(num_neurons) * np.sqrt(2/num_inputs)
-
-        # -- Normal distribution initialization
-        # self.W = np.random.normal(size=(num_neurons, num_inputs))
-        # self.B = np.random.normal(size=num_neurons)
 
         if activation == 'sigmoid':
             self.activation = Activation('sigmoid')
@@ -173,7 +131,6 @@ class NeuralNetwork:
             self.layers.append(Layer(num_neurons=classes, num_inputs=num_inputs, activation='softmax'))
 
     def forward(self, X: np.ndarray) -> np.ndarray:
-        # print("------ Forward ------\n")
         '''
         Passes an input array into the network and returns the network's output (0, 1)
         - X: numpy array of a single sample of input data (batch_size, x)
@@ -181,19 +138,10 @@ class NeuralNetwork:
         # -- Save for backprop
         self.X = X
 
-        # print(f"X.shape: {X.shape}")
-
         for i, layer in enumerate(self.layers):
-            # print(f"-- Layer {i} --\n")
-            # print(f"X: {X}")
-            # print(f"layer.W.T: {layer.W.T}")
             Z = np.dot(X, layer.W.T) + layer.B
 
-            # print(f"Z.shape: {Z.shape}")
-
             A = layer.activation(Z)
-
-            # print(f"A.shape: {A.shape}")
 
             # -- Save weighted sum/output for backprop
             layer.Z = Z
@@ -201,10 +149,7 @@ class NeuralNetwork:
 
             # -- Update X for the next layer
             X = A
-
-            # print("\n")
-        #print(f"S.shape: {self.layers[-1].A.shape}")
-        #print(f"Jacobian.shape: {Activation.d_softmax(self.layers[-1].A).shape}")
+    
         return self.layers[-1].A
     
     def backward(self, y: np.ndarray, y_hat: np.ndarray):
@@ -227,14 +172,13 @@ class NeuralNetwork:
         d_output = dL/da_o * da_o/dz_o * dz_o/dw_i
                  = δ_o * a_i
         '''
+        num_samples = y.shape[0]
 
         delta = []
         der_w = []
+        der_b = []
 
         # -- Output layer
-        # print(f"y_hat.shape: {y_hat.shape}")
-        # print(f"y.shape: {y.shape}")
-        # print(f"(y_hat - y).shape: {(y_hat - y).shape}")
         '''
         Binary case:
         - y: (s, )
@@ -243,19 +187,10 @@ class NeuralNetwork:
         '''
         o = self.layers[-1]
 
-        dL = np.empty(shape=(y.shape[0], self.classes))
-        delta_o = np.empty(shape=(y.shape[0], self.classes))
-
-        # print(f"y_hat.shape: {y_hat.shape}")
-        # print(f"y.shape: {y.shape}")
-
         # -- Binary
         if self.classes == 2:
             dL = (y_hat - y.reshape(-1, 1))
-            # print(f"dL.shape: {dL.shape}")
-            # print(f"o.activation.der(o.Z).shape: {o.activation.der(o.Z).shape}")
             delta_o = np.array(dL * o.activation.der(o.Z))
-            # print(f"delta_o.shape: {delta_o.shape}")
         # -- Multiclass
         else:
             # Convert y to one hot encoding for softmax, e.g. [0 1] for y = 1
@@ -264,23 +199,13 @@ class NeuralNetwork:
             y = one_hot
 
             delta_o = y_hat - y
-            #  print(dL.shape)
 
-            # print(one_hot)
+        der_w_o = np.dot(delta_o.T, self.layers[-2].A) / num_samples
+        der_b_o = np.sum(delta_o, axis=0) / num_samples
 
-        # print(f"o.Z.shape: {o.Z.shape}")
-        # print(f"o.activation.der(o.Z).shape: {o.activation.der(o.Z).shape}")
-
-        
-        
-        der_w_o = np.einsum('os,si->soi', delta_o.T, self.layers[-2].A)
-        # print(f"der_w_o.shape: {der_w_o.shape}")
-        # print(f"delta_o.shape: {delta_o.shape}")
-        # print(f"self.layers[-2].A.T.shape: {self.layers[-2].A.T.shape}")
-        # print(f"delta_o.shape: {delta_o.shape}")
-
-        delta.append(delta_o)
-        der_w.append(der_w_o)
+        delta.insert(0, delta_o)
+        der_w.insert(0, der_w_o)
+        der_b.insert(0, der_b_o)
 
         '''
         For each layer j back from the output layer: 
@@ -294,44 +219,27 @@ class NeuralNetwork:
 
             delta_k = delta[0]
 
-            # print(f"delta_k.shape: {delta_k.shape}")
-
             delta_j = np.dot(delta_k, k.W) * j.activation.der(j.Z)
 
-            # print(f"delta_j.shape: {delta_j.shape}")
+            der_b_j = np.sum(delta_j) / num_samples
 
             if layer == 0:
-                # der_w_j = np.einsum('is,sj->sji', self.X.T, delta_j)
-                der_w_j = np.einsum('js,si->sji', delta_j.T, self.X)
+                der_w_j = np.dot(delta_j.T, self.X) / num_samples
             else:
-                # der_w_j = np.einsum('is,sj->sji', i.A.T, delta_j)
-                der_w_j = np.einsum('js,si->sji', delta_j.T, i.A)
-
-            # print(f"der_w_j.shape: {der_w_j.shape}")
+                der_w_j = np.dot(delta_j.T, i.A) / num_samples
 
             delta.insert(0, delta_j)
             der_w.insert(0, der_w_j)
+            der_b.insert(0, der_b_j)
 
         '''
         Update weights
         - Average the weight derivative among the batch samples for each weight
         '''
         for i, layer in enumerate(self.layers):
-            # print(f"\n---- Layer {i} ----\n")
-            # print(f"der_w[i].shape: {der_w[i].shape}")
-            batch_der_w = np.average(der_w[i], axis=0)
-            batch_der_b = np.average(delta[i], axis=0)
-            # print(f"batch_der_w.shape: {batch_der_w.shape}")
-            # print(f"batch_der_b.shape: {batch_der_b.shape}")
 
-            layer.W = layer.W - self.lr * batch_der_w
-            layer.B = layer.B - self.lr * batch_der_b
-
-            # print(f"layer.W: {layer.W[0][0]}")
-            # print(f"layer.B: {layer.B[0]}")
-
-            # print(f"layer.W.shape: {layer.W.shape}")
-            # print(f"layer.B.shape: {layer.B.shape}")
+            layer.W = layer.W - self.lr * der_w[i]
+            layer.B = layer.B - self.lr * der_b[i]
 
 
     def train(self, train_loader: DataLoader, test_loader: DataLoader, epochs=100):
@@ -339,22 +247,13 @@ class NeuralNetwork:
             for i, (X, y) in enumerate(train_loader):
 
                 y_hat = self.forward(X)
-                loss = self.backward(y, y_hat)
+                self.backward(y, y_hat)
 
-            # Print loss every 100 epochs to monitor progress
-            if y_hat.shape[1] > 1:
-                one_hot = np.zeros(shape=(y.shape[0], self.classes))
-                one_hot[np.arange(y.shape[0]), y.astype(dtype=int)] = 1
-                y = one_hot
-            loss = np.mean((y - y_hat)**2)
-            print(f"Epoch {epoch}, Loss: {loss}")
-
-            # -- Test every 10  epochs
-            if epoch % 1 == 0:
-                print("Test:")
+            if epoch % 100 == 0:
+                loss = MeanSquaredError(y_hat, y, self.classes)
+                print(f"Epoch {epoch}, Loss: {loss}")
                 self.test(test_loader)
-                print("Train:")
-                self.test(train_loader)
+
 
     def test(self, loader: DataLoader):
         total_correct = 0
@@ -362,13 +261,14 @@ class NeuralNetwork:
 
         for i, (X, y) in enumerate(loader):
             y_hat = self.forward(X)
-            # print(f"y_hat {i}: {y_hat}, shape: {y_hat.shape}")
 
-            correct = np.sum(np.round(np.max(y_hat, axis=1).flatten()) == y.flatten())
+            if self.classes == 2:
+                y_hat_class = np.round(y_hat)
+            else:
+                y_hat_class = np.argmax(y_hat, axis=1)
+
+            correct = np.sum(y_hat_class.T == y)
             total_correct += correct
             total_samples += len(y)
 
-            # if i % 50 == 0:
-                # print(f"Batch {i + 1} accuracy: {correct / len(y) * 100:.2f}%")
-            
-        print(f"Test accuracy: {total_correct / total_samples * 100:.2f}%; {total_correct} correct, {total_samples - total_correct} wrong")
+        print(f"Accuracy: {total_correct / total_samples * 100:.2f}%; {total_correct} correct, {total_samples - total_correct} wrong")
