@@ -18,7 +18,7 @@ if __name__ == "__main__":
         # y = [0 if yi == 0 else 1 for yi in y]
         classes = 3
     elif data_id == 1:
-        csv = pd.read_csv('student_performance_data.csv')
+        csv = pd.read_csv('data/student_performance_data.csv')
         data = np.array(csv)
         X = data[:,:-1]
         y = data.T[-1]
@@ -50,7 +50,7 @@ if __name__ == "__main__":
 
     model.save('model')
 
-    loaded_model = model.load('model.json')
+    loaded_model = model.load('saved_models/model.json')
 
     print("Testing loaded model:")
     loaded_model.test(test_loader)

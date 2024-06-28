@@ -8,6 +8,7 @@ Classes:
 '''
 import numpy as np
 import json
+import os
 
 from data import DataLoader
 from metrics import CrossEntropyLoss, MeanSquaredError, Accuracy
@@ -288,7 +289,10 @@ class NeuralNetwork:
                         'W': [layer.W.tolist() for layer in self.layers],
                         'B': [layer.B.tolist() for layer in self.layers]}
         
-        with open(f'{filename}.json', 'w') as file:
+        # -- Create saved_models directory
+        os.makedirs('saved_models', exist_ok=True)
+        
+        with open(f'saved_models/{filename}.json', 'w') as file:
             json.dump(model_params, file)
 
     @staticmethod
