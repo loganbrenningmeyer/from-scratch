@@ -38,8 +38,10 @@ class Activation:
     @staticmethod
     def softmax(Z: np.ndarray) -> np.ndarray:
         # Subtract max for numerical stability
+        # print(f"Z: {Z}")
         exp_Z = np.exp(Z - np.max(Z, axis=1, keepdims=True))
-        return exp_Z / np.sum(exp_Z, axis=1, keepdims=True)
+        # print(f"exp_Z: {exp_Z}")
+        return exp_Z / np.sum(exp_Z, axis=1, keepdims=True) + 1e-15
     
     @staticmethod
     def d_softmax(Z: np.ndarray) -> np.ndarray:
@@ -186,6 +188,7 @@ class NeuralNetwork:
         '''
         batch_size = y.shape[0]
 
+        # -- Lists to store δ_i, ∂w_i, and ∂b_i for each layer i
         delta = []
         der_w = []
         der_b = []
@@ -207,10 +210,12 @@ class NeuralNetwork:
         else:
             # Convert y to one hot encoding for softmax, e.g. [0 1] for y = 1
             y = np.eye(self.num_classes)[y.astype(int)]
-
+            # δ_o = y_hat - y for backprop with softmax/cross entropy loss
             delta_o = y_hat - y
 
+        # ∂W_o = δ_o.T * A_i (averaged over batch)
         der_w_o = np.dot(delta_o.T, self.layers[-2].A) / batch_size
+        # ∂B_o = δ_o
         der_b_o = np.sum(delta_o, axis=0) / batch_size
 
         delta.insert(0, delta_o)
@@ -227,15 +232,20 @@ class NeuralNetwork:
             j = self.layers[layer]
             k = self.layers[layer + 1]
 
+            # Succeeding layer
             delta_k = delta[0]
-
+            # δ_j = ∑(δ_k * W_k) * ∂A/∂Z
             delta_j = np.dot(delta_k, k.W) * j.activation.der(j.Z)
+            # ∂B_j = δ_j (averaged over batch)
+            der_b_j = np.sum(delta_j, axis=0) / batch_size
 
-            der_b_j = np.sum(delta_j) / batch_size
-
+            # -- Input layer
             if layer == 0:
+                # ∂W_j = δ_j.T * X (averaged over batch)
                 der_w_j = np.dot(delta_j.T, self.X) / batch_size
+            # -- Hidden layer
             else:
+                # # ∂W_j = δ_j.T * A_i (averaged over batch)
                 der_w_j = np.dot(delta_j.T, i.A) / batch_size
 
             delta.insert(0, delta_j)
@@ -252,16 +262,22 @@ class NeuralNetwork:
 
 
     def train(self, train_loader: DataLoader, test_loader: DataLoader, epochs=100):
+        print(f"Initial Train Accuracy: {self.test(train_loader)[0] * 100:.2f}%")
+        
         for epoch in range(epochs):
             for X, y in train_loader:
                 y_hat = self.forward(X)
                 self.backward(y, y_hat)
 
-            loss = CrossEntropyLoss(y_hat, y)
-            print(f"Epoch {epoch} -- Loss: {loss}, Train Accuracy: {Accuracy(y_hat, y)[0] * 100:.2f}%")
+            # X, y = next(train_loader)
+            # y_hat = self.forward(X)
+            # self.backward(y, y_hat)
 
-            if epoch % 10 == 0:
-                self.test(test_loader)
+            loss = CrossEntropyLoss(y_hat, y)
+            print(f"Epoch {epoch} -- Loss: {loss}, Train Accuracy: {self.test(train_loader)[0] * 100:.2f}%")
+
+            # if epoch % 10 == 0:
+                # self.test(test_loader)
 
 
     def test(self, loader: DataLoader):
@@ -278,7 +294,8 @@ class NeuralNetwork:
             total_incorrect += batch_incorrect
             total_accuracy += batch_accuracy
 
-        print(f"-- Test Accuracy: {total_accuracy / (i + 1) * 100:.2f}%; {total_correct} correct, {total_incorrect} incorrect")
+        return total_accuracy / (i + 1), total_correct, total_incorrect
+        # print(f"-- Test Accuracy: {total_accuracy / (i + 1) * 100:.2f}%; {total_correct} correct, {total_incorrect} incorrect")
 
     def save(self, filename: str) -> None:
         model_params = {'layers': [layer.num_neurons for layer in self.layers[:-1]],

@@ -2,6 +2,10 @@ import numpy as np
 
 class Dataset:
     def __init__(self, X, y, train_ratio=0.8):
+        # -- Normalize X
+        # X.shape = (S, c)
+        X = (X - np.min(X, axis=0)) / ((np.max(X, axis=0) - np.min(X, axis=0)) + 1e-8)
+
         dataset = np.array([(x, yi) for x, yi in zip(X, y)], dtype=object)
         np.random.shuffle(dataset)
 
