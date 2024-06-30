@@ -89,7 +89,7 @@ class Layer:
         '''
         self.num_neurons = num_neurons
 
-        # -- Arrays to store weights/biases for each neuron in the layer
+        # Arrays to store weights/biases for each neuron in the layer
         '''
         He Initialization:
         - W[l] = np.random.randn(size_l, size_l-1) * np.sqrt(2/size_l-1)
@@ -125,20 +125,22 @@ class NeuralNetwork:
         self.in_features = in_features
         self.num_classes = num_classes
 
+        self.lr = lr
+
         if activation not in ['sigmoid', 'relu', 'leaky']:
-            print("Error: Invalid activation function")
+            print("Error: Invalid hidden layer activation function")
             return
         self.activation = activation
-        self.lr = lr
         
+        # -- Array to hold Layer objects
         self.layers = []
 
-        # -- Will update first layer's num_inputs when data is provided
+        # -- Add hidden layers
         num_inputs = in_features
 
         for num_neurons in layers:
             self.layers.append(Layer(num_neurons, num_inputs, activation))
-            # -- Update num_inputs for next layer
+            # Update num_inputs for next layer
             num_inputs = num_neurons
 
         # -- Add output layer
@@ -152,7 +154,7 @@ class NeuralNetwork:
         Passes an input array into the network and returns the network's output (0, 1)
         - X: numpy array of a single sample of input data (batch_size, x)
         '''
-        # -- Save for backprop
+        # Save input for backprop
         self.X = X
 
         for layer in self.layers:
@@ -160,11 +162,10 @@ class NeuralNetwork:
 
             A = layer.activation(Z)
 
-            # -- Save weighted sum/output for backprop
             layer.Z = Z
             layer.A = A
 
-            # -- Update X for the next layer
+            # Next layer in (X) = Current layer out (A)
             X = A
     
         return self.layers[-1].A
@@ -186,7 +187,7 @@ class NeuralNetwork:
         '''
         batch_size = y.shape[0]
 
-        # -- Lists to store δ_i, ∂w_i, and ∂b_i for each layer i
+        # Lists to store δ_i, ∂w_i, and ∂b_i for each layer i
         delta = []
         der_w = []
         der_b = []
@@ -216,6 +217,7 @@ class NeuralNetwork:
         # ∂B_o = δ_o
         der_b_o = np.sum(delta_o, axis=0) / batch_size
 
+        # Store δ_o, ∂W_o, and ∂B_o
         delta.insert(0, delta_o)
         der_w.insert(0, der_w_o)
         der_b.insert(0, der_b_o)
@@ -246,6 +248,7 @@ class NeuralNetwork:
                 # # ∂W_j = δ_j.T * A_i (averaged over batch)
                 der_w_j = np.dot(delta_j.T, i.A) / batch_size
 
+            # Store δ_j, ∂W_j, and ∂B_j
             delta.insert(0, delta_j)
             der_w.insert(0, der_w_j)
             der_b.insert(0, der_b_j)
@@ -267,15 +270,8 @@ class NeuralNetwork:
                 y_hat = self.forward(X)
                 self.backward(y, y_hat)
 
-            # X, y = next(train_loader)
-            # y_hat = self.forward(X)
-            # self.backward(y, y_hat)
-
             loss = CrossEntropyLoss(y_hat, y)
             print(f"Epoch {epoch} -- Loss: {loss}, Train Accuracy: {self.test(train_loader)[0] * 100:.2f}%")
-
-            # if epoch % 10 == 0:
-                # self.test(test_loader)
 
 
     def test(self, loader: DataLoader):
@@ -293,7 +289,6 @@ class NeuralNetwork:
             total_accuracy += batch_accuracy
 
         return total_accuracy / (i + 1), total_correct, total_incorrect
-        # print(f"-- Test Accuracy: {total_accuracy / (i + 1) * 100:.2f}%; {total_correct} correct, {total_incorrect} incorrect")
 
     def save(self, filename: str) -> None:
         model_params = {'layers': [layer.num_neurons for layer in self.layers[:-1]],
@@ -304,7 +299,7 @@ class NeuralNetwork:
                         'W': [layer.W.tolist() for layer in self.layers],
                         'B': [layer.B.tolist() for layer in self.layers]}
         
-        # -- Create saved_models directory
+        # Create saved_models directory
         os.makedirs('models/fnn/saved_models', exist_ok=True)
         
         with open(f'models/fnn/saved_models/{filename}.json', 'w') as file:
