@@ -1,5 +1,8 @@
 # Machine Learning From Scratch
 This repository contains several popular machine learning algorithms built "from scratch" i.e. only using numpy, no machine learning libraries allowed.
+<br><br>
+The directory for each model provides a README explaining the model's purpose, underlying mathematics, and implementation to help shine a light on its innerworkings for anyone who is curious.
+<br><br>
 * **Models** (Implemented: ✅, In-progress: 🚧)
   * Neural Networks
     * [✅] Feedforward Neural Network (**FNN**)
