@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
-    data_id = 1
+    data_id = 3
 
     if data_id == 0:
         iris = load_iris()
@@ -43,16 +43,16 @@ if __name__ == "__main__":
         classes = 10
     dataset = Dataset(X, y)
 
-    train_loader = DataLoader(dataset.train_dataset, batch_size=16, shuffle=True)
+    train_loader = DataLoader(dataset.train_dataset, batch_size=128, shuffle=True)
     test_loader = DataLoader(dataset.test_dataset, batch_size=1, shuffle=False)
 
-    model = NeuralNetwork(layers=[256, 128, 64],
+    model = NeuralNetwork(layers=[128, 64, 32],
                           activation='leaky',
                           in_features=X.shape[1],
                           num_classes=classes,
                           lr=0.01)
     
-    model.train(train_loader, test_loader, epochs=100)
+    model.train(train_loader, test_loader, epochs=10)
 
     accuracy, correct, incorrect = model.test(test_loader)
     print(f"Test accuracy: {accuracy * 100:.2f}%")
