@@ -9,13 +9,10 @@ Input:
 
 Convolutional Layer:
 - Apply kernels to the inputs to extract features
-    * Take weighted sum from each channel of the image
-        - image: (rows, cols, channels) -> (rows, cols)
 - Activation function: Apply ReLU to feature maps
 
 Pooling Layer:
 - Max pooling/average pooling to reduce dimensionality of feature maps
-    * 
 
 Flattening:
 - Convert 3D feature maps to 1D vectors
