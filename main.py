@@ -2,7 +2,6 @@ import tensorflow as tf
 import numpy as np
 import pandas as pd
 
-from models.neural_networks.fnn.fnn import NeuralNetwork
 from utils.data import Dataset, DataLoader
 
 from sklearn.datasets import load_iris
