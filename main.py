@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import pandas as pd
 
-from models.fnn.fnn import NeuralNetwork
+from models.neural_networks.fnn.fnn import NeuralNetwork
 from utils.data import Dataset, DataLoader
 
 from sklearn.datasets import load_iris
@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
-    data_id = 1
+    data_id = 2
 
     if data_id == 0:
         iris = load_iris()
