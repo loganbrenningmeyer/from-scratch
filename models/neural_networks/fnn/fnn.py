@@ -47,6 +47,13 @@ class Layer:
         else:
             print("Invalid activation function")
 
+    def forward(self, X):
+        # print(f"X.shape: {X.shape}")
+        # print(f"W.T.shape: {self.W.T.shape}")
+        # print(f"B.shape: {self.B.shape}")
+        # print(f"np.dot(X, W.T).shape: {np.dot(X, self.W.T).shape}")
+        return np.dot(X, self.W.T) + self.B
+
 
 class NeuralNetwork:
     def __init__(self, layers: list[int], 
@@ -99,7 +106,7 @@ class NeuralNetwork:
         self.X = X
 
         for layer in self.layers:
-            Z = np.dot(X, layer.W.T) + layer.B
+            Z = layer.forward(X)
 
             A = layer.activation(Z)
 
