@@ -25,3 +25,8 @@ Backpropagation:
 - Backprop through FCL
 - Backprop through pooling/convolutional layers
 '''
+class ConvLayer:
+    def __init__(self, sample_shape: 
+                       num_kernels: int,
+                       kernel_size: int,
+                       )

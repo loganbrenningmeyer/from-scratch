@@ -15,7 +15,9 @@ from utils.metrics import CrossEntropyLoss, MeanSquaredError, Accuracy
 from utils.activation import Activation
         
 class Layer:
-    def __init__(self, num_neurons: int, num_inputs: int, activation: str):
+    def __init__(self, num_neurons: int, 
+                       num_inputs: int, 
+                       activation: str):
         '''
         An array of neurons representing a layer in the network
 
@@ -47,7 +49,9 @@ class Layer:
 
 
 class NeuralNetwork:
-    def __init__(self, layers: list[int], activation: str, in_features: int, num_classes: int, lr: float = 0.01):
+    def __init__(self, layers: list[int], 
+                       activation: str, 
+                       in_features: int, num_classes: int, lr: float = 0.01):
         '''
         Network built as an array of layers
 
