@@ -3,6 +3,8 @@ import torch
 import torch.nn.functional as F
 
 from utils.activation import Activation
+
+from models.neural_networks.fnn.fnn import NeuralNetwork
 '''
 CNN Architecture:
 
@@ -28,8 +30,121 @@ Backpropagation:
 - Backprop through FCL
 - Backprop through pooling/convolutional layers
 '''
+class ConvNeuralNetwork:
+    def __init__(self):
+        '''
+        CNN built as an array of layers
+
+        - Initialize empty list of layers
+        '''
+        # -- Array to hold ConvLayer/PoolLayer objects
+        self.layers = []
+
+    def add_conv(self, num_filters, filter_size):
+        '''
+        Appends a new ConvLayer to the layers array
+        
+        Parameters:
+        - num_filters: # of filters in the ConvLayer
+        - filter_size: size k of each filter of shape (k, k)
+        
+        Determines in_channels based on the out_channels of the previous layer
+        '''
+        # -- Determine in_channels based on previous layers
+        if len(self.layers) != 0:
+            # Previous PoolLayer (out_channels = in_channels)
+            if type(self.layers[-1]) == PoolLayer:
+                in_channels = self.layers[-1].in_channels
+            # Previous ConvLayer (out_channels = num_filters)
+            elif type(self.layers[-1]) == ConvLayer:
+                in_channels = self.layers[-1].num_filters
+        else:
+            # -- First ConvLayer, so 3 channels for RGB
+            in_channels = 3
+
+        self.layers.append(ConvLayer(in_channels, num_filters, filter_size))
+
+    def add_pool(self, method, filter_size):
+        '''
+        Appends a new PoolLayer to the layers array
+
+        Parameters:
+        - method: Pooling method ('max' or 'avg')
+        - filter_size: size k of pooling filter of shape (k, k)
+        '''
+        # -- Determine in_channels based on previous layers
+        if len(self.layers) != 0:
+            # Previous PoolLayer (out_channels = in_channels)
+            if type(self.layers[-1]) == PoolLayer:
+                in_channels = self.layers[-1].in_channels
+            # Previous ConvLayer (out_channels = num_filters)
+            elif type(self.layers[-1]) == ConvLayer:
+                in_channels = self.layers[-1].num_filters
+        else:
+            # -- First ConvLayer, so 3 channels for RGB
+            in_channels = 3
+
+        self.layers.append(PoolLayer(in_channels, method, filter_size))
+
+    def add_fcl(self, sample_shape, 
+                      layers,
+                      num_classes,
+                      activation='relu',
+                      lr=0.01):
+        '''
+        Initializes a FCL for the final decision-making
+        layer of the CNN
+        '''
+        # -- Get sample output shape
+        sample = np.ones(shape=sample_shape)
+        output_shape = self.extract_features(sample).shape
+
+        # -- Determine # input features based on final output shape (channels * x * y)
+        in_features = output_shape[1] * output_shape[2] * output_shape[3]
+
+        # -- Initialize FNN
+        self.fnn = NeuralNetwork(layers=layers,
+                                 activation=activation,
+                                 in_features=in_features,
+                                 num_classes=num_classes,
+                                 lr=lr)
+
+    def extract_features(self, X):
+        '''
+        Pass input X through each layer of the Convolutional Network
+        '''
+        # -- Pass through ConvLayers and PoolLayers
+        for layer in self.layers:
+            output = layer.forward(X)
+
+            X = output
+
+        return X
+    
+    def classify(self, X):
+        '''
+        Pass extracted features X through the FCL to classify
+        '''
+        # -- Pass through FCL
+        return self.fnn.forward(X)
+    
+    def forward(self, X):
+        '''
+        Pass input X through both extract_features (ConvLayers/PoolLayers)
+        and classify (FCL)
+        '''
+        # -- Extract features
+        features = self.extract_features(X)
+
+        # -- Flatten features (preserve batch dimension)
+        features = np.reshape(features, (features.shape[0], -1))
+
+        # -- Feed into FCL and return decision
+        return self.classify(features)
+
+
 class ConvLayer:
-    def __init__(self, num_filters, filter_size):
+    def __init__(self, in_channels, num_filters, filter_size):
         '''
         Randomly initializes kernels with a Gaussian distribution
 
@@ -40,10 +155,15 @@ class ConvLayer:
         i.e. filters[i] = ith kernel
              filters[i][j] = ith kernel, jth channel
         '''
+        # -- Set attributes
+        self.in_channels = in_channels
+        self.num_filters = num_filters
+        self.filter_size = filter_size
+
         # -- He initialization of filters with shape (N_k, 3, k, k)
         self.filters = np.random.normal(loc=0, 
                                         scale=np.sqrt(2.0 / (3 * filter_size**2)), 
-                                        size=(num_filters, 3, filter_size, filter_size))
+                                        size=(num_filters, in_channels, filter_size, filter_size))
         
         # -- Zero initialization of biases
         self.bias = np.zeros(num_filters)
@@ -71,29 +191,39 @@ class ConvLayer:
         return A
     
 class PoolLayer:
-    def __init__(self, type, filter_size):
-        if type == 'max':
-            self.pool = F.max_pool2d()
-        elif type == 'avg':
-            self.pool = F.avg_pool2d()
-
+    def __init__(self, in_channels, method, filter_size):
+        self.in_channels = in_channels
+        self.method = method
         self.filter_size = filter_size
 
     def forward(self, X):
-        # -- Apply pooling 
-        self.P = np.array(self.pool(input=torch.from_numpy(X),
-                                    kernel_size=self.filter_size,
-                                    stride=self.filter_size))
+        # -- Apply pooling (max or avg)
+        if self.method == 'max':
+            P = np.array(F.max_pool2d(input=torch.from_numpy(X),
+                                           kernel_size=self.filter_size,
+                                           stride=self.filter_size))
+        else:
+            P = np.array(F.avg_pool2d(input=torch.from_numpy(X),
+                                           kernel_size=self.filter_size,
+                                           stride=self.filter_size))
         
-        return self.P
+        self.P = P
+
+        return P
 
 
-if __name__ == "__main__":
-    img = np.ones(shape=(2, 3, 100, 100))
-    layer = ConvLayer(32, 3)
-    maps = layer.forward(img)
-    print(f"maps.shape: {maps.shape}")
-    pool = PoolLayer('max', 2)
-    P = pool.forward(maps)
-    print(f"P.shape: {P.shape}")
+# if __name__ == "__main__":
+#     img = np.ones(shape=(2, 3, 100, 100))
+
+#     layer = ConvLayer(32, 3)
+#     maps = layer.forward(img)
+#     print(f"maps.shape: {maps.shape}")
+
+#     pool = PoolLayer('max', 2)
+#     P = pool.forward(maps)
+#     print(f"P.shape: {P.shape}")
+
+#     layer2 = ConvLayer(64, 3)
+#     maps2 = layer2.forward()
+#     print(f"maps2.shape: {maps2.shape}")
 

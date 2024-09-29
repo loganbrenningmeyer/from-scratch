@@ -48,17 +48,15 @@ class Layer:
             print("Invalid activation function")
 
     def forward(self, X):
-        # print(f"X.shape: {X.shape}")
-        # print(f"W.T.shape: {self.W.T.shape}")
-        # print(f"B.shape: {self.B.shape}")
-        # print(f"np.dot(X, W.T).shape: {np.dot(X, self.W.T).shape}")
         return np.dot(X, self.W.T) + self.B
 
 
 class NeuralNetwork:
     def __init__(self, layers: list[int], 
                        activation: str, 
-                       in_features: int, num_classes: int, lr: float = 0.01):
+                       in_features: int, 
+                       num_classes: int, 
+                       lr: float = 0.01):
         '''
         Network built as an array of layers
 

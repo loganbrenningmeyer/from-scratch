@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 from models.neural_networks.fnn.fnn import NeuralNetwork
-from models.neural_networks.cnn.cnn import ConvLayer, PoolLayer
+from models.neural_networks.cnn.cnn import ConvNeuralNetwork
 from utils.data import Dataset, DataLoader
 
 from sklearn.datasets import load_iris
@@ -11,13 +11,40 @@ from PIL import Image
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-    img = np.ones(shape=(2, 3, 100, 100))
-    layer = ConvLayer(32, 3)
-    maps = layer.forward(img)
+    sample_shape = (2, 3, 100, 100)
+    img = np.ones(shape=sample_shape)
+
+    cnn = ConvNeuralNetwork()
+
+    # -- Add layers
+    cnn.add_conv(32, 3)
+    cnn.add_pool('max', 2)
+    cnn.add_conv(64, 3)
+    cnn.add_pool('max', 2)
+
+    # -- Build fully connected layer
+    cnn.add_fcl(sample_shape=sample_shape,
+                layers=[128, 64, 32],
+                num_classes=10,
+                activation='relu',
+                lr=0.01)
+    
+    # -- Forward pass
+    maps = cnn.forward(img)
     print(f"maps.shape: {maps.shape}")
-    pool = PoolLayer('max', 2)
-    P = pool.forward(maps)
-    print(f"P.shape: {P.shape}")
+    print(maps)
+
+    # layer = ConvLayer(3, 32, 3)
+    # maps = layer.forward(img)
+    # print(f"maps.shape: {maps.shape}")
+
+    # pool = PoolLayer('max', 2)
+    # P = pool.forward(maps)
+    # print(f"P.shape: {P.shape}")
+
+    # layer2 = ConvLayer(32, 64, 3)
+    # maps2 = layer2.forward(P)
+    # print(f"maps2.shape: {maps2.shape}")
 
 # if __name__ == "__main__":
 
